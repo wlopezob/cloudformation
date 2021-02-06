@@ -1,0 +1,197 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  EnvironmentName:
+    Description: El enviroment como prefijo para los recursos
+    Type: String
+    Default: dev
+  VpcCIDR:
+    Description: Por favor ingrese el IP range (CIDR notation) para este VPCmain
+    Type: String
+    Default: 10.10.0.0/16
+  Privada01SubnetCIDR:
+    Description: Por favor ingrese el IP range(CIDR notation) para la subnet privada en la 1era AZ
+    Type: String
+    Default: 10.10.30.0/24
+  Privada02SubnetCIDR:
+    Description: Por favor ingrese el IP range(CIDR notation) para la subnet privada en la 2da AZ
+    Type: String
+    Default: 10.10.40.0/24
+  Publica01SubnetCIDR:
+    Description: Por favor ingrese el IP range(CIDR notation) para la subnet publica en la 1era AZ
+    Type: String
+    Default: 10.10.1.0/24
+  Publica02SubnetCIDR:
+    Description: Por favor ingrese el IP range(CIDR notation) para la subnet publica en la 2da AZ
+    Type: String
+    Default: 10.10.10.0/24
+Resources:
+  #VPC red interna
+  VPCmain:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: yes
+      EnableDnsHostnames: yes
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Sub "${EnvironmentName}",!Ref "AWS::StackName", "VPC" ]]
+  #Internetgateway Recurso que proporciona internet al VPCmmain
+  Igw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Sub "${EnvironmentName}",!Ref "AWS::StackName", "Igw" ]]
+  #Atachamos el Igw al VPCmain
+  IgwAttachmentVPCMain:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref Igw
+      VpcId: !Ref VPCmain
+  #subnet de privada 01
+  Privada01Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCmain
+      AvailabilityZone: !Select [0, !GetAZs ''] #selecciona el item 1 del listado de objetos(!GetAZs '': devuelve el listado de las AZ disponible de la region)
+      CidrBlock: !Ref Privada01SubnetCIDR
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Sub "${EnvironmentName}",!Ref "AWS::StackName", "subpri01" ]]
+  #subnet de privada 02
+  Privada02Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCmain
+      AvailabilityZone: !Select [1, !GetAZs ''] #selecciona el item 2 del listado de objetos(!GetAZs '': devuelve el listado de las AZ disponible de la region)
+      CidrBlock: !Ref Privada02SubnetCIDR
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Sub "${EnvironmentName}",!Ref "AWS::StackName", "subpri02" ]]
+  #subnet de publica 01
+  Publica01Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCmain
+      AvailabilityZone: !Select [0, !GetAZs ''] #selecciona el item 2 del listado de objetos(!GetAZs '': devuelve el listado de las AZ disponible de la region)
+      CidrBlock: !Ref Publica01SubnetCIDR
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Sub "${EnvironmentName}",!Ref "AWS::StackName", "subpub01" ]]
+  #subnet de publica 02
+  Publica02Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPCmain
+      AvailabilityZone: !Select [1, !GetAZs ''] #selecciona el item 1 del listado de objetos(!GetAZs '': devuelve el listado de las AZ disponible de la region)
+      CidrBlock: !Ref Publica02SubnetCIDR
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Sub "${EnvironmentName}",!Ref "AWS::StackName", "subpub02" ]]
+  #ElasticIP del natgateway
+  EIPNatGateway:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+  #Natgateway para instancias privadas pero tiene que estar ubicado en la region publica
+  NatGatewaySubnet:
+    Type: AWS::EC2::NatGateway
+    DependsOn: EIPNatGateway
+    Properties:
+      AllocationId: !GetAtt EIPNatGateway.AllocationId #el elasticIP
+      SubnetId: !Ref Publica01Subnet #ubicado en la subnet publica 01
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Sub "${EnvironmentName}",!Ref "AWS::StackName", "nat" ]]
+  #RouteTable01 para la privada
+  RouteTablePrivada:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPCmain
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Sub "${EnvironmentName}",!Ref "AWS::StackName", "routetablepri" ]]
+  #asignacion del RouteTable01 a la subnet privada 01
+  RouteTableSubnetPrivada01Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTablePrivada
+      SubnetId: !Ref Privada01Subnet
+  #asignacion del RouteTable01 a la subnet privada 02
+  RouteTableSubnetPrivada02Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTablePrivada
+      SubnetId: !Ref Privada02Subnet
+  #asignacion del Ruteo del RouteTablePrivada para que tenga acceso a internet mediante el natgateway
+  RoutePrivada:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTablePrivada
+      DestinationCidrBlock: 0.0.0.0/0 #acceso a internet
+      NatGatewayId: !Ref NatGatewaySubnet #sale a internet mediante el natgateway
+  #RouteTable para la publica
+  RouteTablePublica:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPCmain
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Sub "${EnvironmentName}",!Ref "AWS::StackName", "routetablepub" ]]
+  #asignacion del RouteTablePublica a la subnet publica 01
+  RouteTableSubnetPublica01Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTablePublica
+      SubnetId: !Ref Publica01Subnet
+  #asignacion del RouteTablePublica a la subnet publica 02
+  RouteTableSubnetPublica02Association:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTablePublica
+      SubnetId: !Ref Publica02Subnet
+  #asignacion del Ruteo del RouteTablePulico para que tenga acceso a internet mediante el internetgateway
+  RoutePublica:
+    Type: AWS::EC2::Route
+    DependsOn: IgwAttachmentVPCMain
+    Properties:
+      RouteTableId: !Ref RouteTablePublica
+      DestinationCidrBlock: 0.0.0.0/0 #acceso a internet
+      GatewayId: !Ref Igw #sale a internet mediante el natgateway
+Outputs:
+  VPCmain:
+    Description: Mi vpc principal VPCmain
+    Value: !Ref VPCmain
+    #Export:
+    #  Name: VPCmain
+  Igw:
+    Description: InternetGateway de la VPCmain
+    Value: !Ref Igw
+    #Export:
+    #  Name: Igw
+  Privada01Subnet:
+    Description: Subnet Privada 01 del VPCmain
+    Value: !Ref Privada01Subnet
+    #Export:
+    #  Name: Privada01Subnet
+  Privada02Subnet:
+    Description: Subnet Privada 02 del VPCmain
+    Value: !Ref Privada02Subnet
+    #Export:
+    #  Name: Privada02Subnet
+  Publica01Subnet:
+    Description: Subnet Privada 02 del VPCmain
+    Value: !Ref Publica01Subnet
+    #Export:
+    #  Name: Publica01Subnet
+  Publica02Subnet:
+    Description: Subnet Privada 02 del VPCmain
+    Value: !Ref Publica02Subnet
+    #Export:
+    #  Name: Publica02Subnet
+  EIPNatGateway:
+    Description: EIP del NatGateway
+    Value: !GetAtt EIPNatGateway.AllocationId
+    #Export:
+    #  Name: EIPNatGateway

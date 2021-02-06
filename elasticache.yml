@@ -1,0 +1,189 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  EnvironmentName:
+    Description: El enviroment como prefijo para los recursos
+    Type: String
+    Default: dev
+  RedisVersion:
+    Description: Ingrese la version de RedisVersion
+    Type: String
+    Default: 6.x
+  RedisPort:
+    Description: Ingrese el puerto de Redis
+    Type: Number
+    Default: 6379
+
+
+Resources:
+  MiVPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: "https://awscloudlabtemplate.s3.amazonaws.com/vpc.yml"
+      Parameters: 
+        EnvironmentName: !Ref EnvironmentName
+      Tags: 
+        - Key: Name
+          Value: MiVPCStack
+  #Creamos el SecurityGroup para el lambda function
+  MiSecurityGroupLambdaFunction:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: MiVPCStack
+    Properties:
+      VpcId: !GetAtt MiVPCStack.Outputs.VPCmain
+      GroupDescription: Security Group del lambda function
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+  #Creamos el Rol para lambda
+  MiRolLambdaFunction:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['-', [!Sub "${EnvironmentName}",!Ref "AWS::StackName", "roleLambdaRedis" ]]
+      Description: Role para ejecutar al rediscache en el VPC
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version:  "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+                  - ec2:AssignPrivateIpAddresses
+                  - ec2:UnassignPrivateIpAddresses
+                Resource: "*"
+  #Instanciamos el Role
+  MiInstanciaRoleLambdaFunction:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Join ['-', [!Sub "${EnvironmentName}",!Ref "AWS::StackName", "instanceroleLambdaFunction" ]]
+      Path: /
+      Roles: 
+        - !Ref MiRolLambdaFunction
+  #Creamos el lambda function
+  MiLambdaFunctionRedis:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Join ['-', [!Sub "${EnvironmentName}",!Ref "AWS::StackName", "fnRedis" ]]
+      Runtime: !FindInMap [RuntimeFunctionLambda, !Ref RedisVersion, VersionPython]
+      Handler: index.lambda_handler
+      Description: LambdaFunction para el cluster Redis
+      Role: !GetAtt MiRolLambdaFunction.Arn
+      Timeout: 5
+      Environment:
+        Variables:
+          REDIS_URL: !GetAtt MiElastiCacheRedis.RedisEndpoint.Address
+          REDIS_STANDARD_VALIDATION: 0
+      Code:
+        ZipFile: !Sub |
+          import json
+          import redis
+          import os
+          REDIS_URL = os.environ['REDIS_URL']
+          REDIS_STANDARD_VALIDATION = os.environ['REDIS_STANDARD_VALIDATION']
+          REDIS_OBJECT = redis.StrictRedis(host=REDIS_URL, port=6379, db=REDIS_STANDARD_VALIDATION)
+          def lambda_handler(event, context):
+              value = event['key1']
+              set_key_value("llave", value)
+              get_key_value("llave")
+              
+          def set_key_value(key, value):
+              REDIS_OBJECT.set(key, value)
+
+          def get_key_value(key):
+              tc = REDIS_OBJECT.get(key);
+              print(tc)
+      TracingConfig:
+        Mode: Active
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref MiSecurityGroupLambdaFunction
+        SubnetIds:
+          - !GetAtt MiVPCStack.Outputs.Privada01Subnet
+          - !GetAtt MiVPCStack.Outputs.Privada02Subnet
+
+  #ParameterGroup personalizado
+  MiParameterGroupRedis:
+    Type: AWS::ElastiCache::ParameterGroup
+    Properties:
+      CacheParameterGroupFamily: !FindInMap [ParameterGroupFamily, !Ref RedisVersion, GroupFamily]
+      Description: ParameterGroup Redis
+  #Subnetgroup del cache redis
+  MiSubNetGroupCacheRedis:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      CacheSubnetGroupName: myCacheSubnetGroupName
+      Description: "El SubnetGroup del cache Redis"
+      SubnetIds:
+        - !GetAtt MiVPCStack.Outputs.Publica01Subnet
+        - !GetAtt MiVPCStack.Outputs.Publica02Subnet
+  #SecurityGroupIds del cache redis
+  MiSecurityGroupElastiCacheRedis:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: MiSecurityGroupLambdaFunction
+    Properties:
+      VpcId: !GetAtt MiVPCStack.Outputs.VPCmain
+      GroupDescription: Security Group del ElastiCache
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref RedisPort
+          ToPort: !Ref RedisPort
+          #CidrIp: 0.0.0.0/0
+          SourceSecurityGroupId: !GetAtt MiSecurityGroupLambdaFunction.GroupId #!Ref MiSecurityGroupLambdaFunction
+
+  #ElactiCache Redis
+  MiElastiCacheRedis:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      ClusterName: !Join ['-', [!Sub "${EnvironmentName}",!Ref "AWS::StackName", "redis" ]]
+      Engine: redis
+      EngineVersion: !Ref RedisVersion
+      Port: !Ref RedisPort
+      CacheNodeType: cache.t2.micro
+      CacheParameterGroupName: !Ref MiParameterGroupRedis
+      NumCacheNodes: 1
+      CacheSubnetGroupName: !Ref MiSubNetGroupCacheRedis
+      VpcSecurityGroupIds:  
+        - !GetAtt MiSecurityGroupElastiCacheRedis.GroupId
+      SnapshotRetentionLimit: 7
+
+Mappings:
+  ParameterGroupFamily:
+    6.x:
+      GroupFamily: redis6.x
+    5.0.6:
+      GroupFamily: redis5.0
+  RuntimeFunctionLambda:
+    6.x:
+      VersionPython: python3.7
+    5.0.6:
+      VersionPython: python3.7
+Outputs:
+  StackRef:
+    Value: !Ref MiVPCStack
+  MiElastiCacheRedis:
+    Description: "MiElastiCacheRedis"
+    Value: !Join [' ',[!Ref MiElastiCacheRedis, !GetAtt MiElastiCacheRedis.RedisEndpoint.Address]]
+    Export:
+      Name: MiElastiCacheRedis
+  MiLambdaFunctionRedis:
+    Description: "MiLambdaFunctionRedis"
+    Value: !Ref MiLambdaFunctionRedis
+  OutputFromNestedStack:
+    Value: !GetAtt MiVPCStack.Outputs.VPCmain

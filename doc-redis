@@ -1,0 +1,20 @@
+#ElastiCache-Redis usando CLI (Cloud9)
+#Para conectarnos utilizando la CLI debemos ejecutarlos siguientes comandos en una terminal bash de Cloud9 (Basada en AMI Linux):
+
+sudo yum install gcc
+wget http://download.redis.io/redis-stable.tar.gz 
+tar xvzf redis-stable.tar.gz 
+cd redis-stable 
+make 
+src/redis-cli -c -h Configuration_Endpoint -p 6379
+
+
+
+#crear la libreria de redis y añadir como layer al lambda
+cd $HOME
+mkdir -p temp/python
+cd temp/python
+pip install redis  -t .
+cd ..
+zip -r9 ../utils_layer.zip .
+aws lambda publish-layer-version --layer-name lambda_utils      --description "added unsoported libs  redis"      --zip-file fileb://../utils_layer.zip  --compatible-runtimes  python3.6 python3.7 python3.8 --region us-east-1

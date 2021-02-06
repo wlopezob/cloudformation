@@ -1,0 +1,2 @@
+#!/bin/bash
+aws cloudformation deploy --region us-east-1 --stack-name mielasticachestack  --parameter-overrides EnvironmentName="dev" --template-file ./elasticache.yml --capabilities CAPABILITY_IAM --capabilities CAPABILITY_NAMED_IAM

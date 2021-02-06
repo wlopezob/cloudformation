@@ -1,0 +1,2 @@
+#!/bin/bash
+aws cloudformation deploy --region us-west-2 --stack-name miec2stack  --parameter-overrides EnvironmentName="MiAmbiente" LlaveEc2="KeyEc2CloudFormationOregon" --template-file ./instancia.yml

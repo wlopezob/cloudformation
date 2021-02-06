@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  LlaveEc2:
+    Description: "Llave del servidor"
+    Type: String
+    Default: KeyEc2CloudFormationVirginia
+  EnvironmentName:
+    Description: "A prefix for the resource names."
+    Type: String
+    Default: MiPrimerLabCFN
+
+Resources:
+  Instancia01:
+    Type: 'AWS::EC2::Instance'
+    Properties: 
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AmazonLinux2]
+      InstanceType: t2.micro
+      InstanceInitiatedShutdownBehavior: terminate
+      KeyName: !Ref LlaveEc2
+      #SubnetId: subnet-095799538e3a5008f #subnet por defecto
+      SecurityGroupIds:
+        - !Ref SecurityGroup01
+      Tags:
+        - Key: Name
+          Value: !Sub "CDA - ${EnvironmentName}"
+      UserData:
+        Fn::Base64: !Sub | 
+            #!/bin/bash
+            yum update -y
+            yum install httpd -y
+            systemctl enable httpd
+            systemctl restart httpd
+            bash -c "echo 'hola desde cloudformation ${AWS::Region}' >> /var/www/html/index.html"
+    DependsOn:
+      #- ElasticIP01
+      - SecurityGroup01
+  ElasticIP01: #elasticIP
+    Type: 'AWS::EC2::EIP'
+  ElasticIP01Assoc: #referencia del elasticIP con la EC2 instancia
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref Instancia01
+      EIP: !Ref ElasticIP01
+  SecurityGroup01:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: "Security group mi primera instancia"
+      #VpcId: vpc-0af860bdb15f3c8e5 #vpc default
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      AmazonLinux2: ami-047a51fa27710816e
+      RegionAlias: "N. Virginia"
+    us-west-2:
+      AmazonLinux2: ami-0e999cbd62129e3b1
+      RegionAlias: "Oregon"
+
+Outputs:
+  Instancia01:
+    Description: "IntanciaId del EC2 - Instancia01"
+    Value: !Ref Instancia01
+    Export:
+      Name: Instancia01
+  EIPPublica:
+    Description: "IP publica de la instancia"
+    Value: !Ref ElasticIP01
+    Export:
+      Name: EIPPublica
