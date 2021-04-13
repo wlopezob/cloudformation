@@ -23,7 +23,7 @@ microk8s.kubectl apply -f ingress.yml
 ```
 ## Probando el app whoami
 ```
-microk8s.kubectl -f whoami/.
+microk8s.kubectl apply -f whoami/.
 
 ```
 ## Curl EndPoint
