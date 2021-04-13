@@ -1,6 +1,6 @@
-# cloudformation
+# cloudformation - Microk8s
 
-## Demo de instancia EC2 en virginia, modificar el parametro de la llave pem
+## Demo de instancia EC2 con Microk8s Region virginia, modificar el parametro de la llave pem
 ```
 # instala automaticamente microk8s
 sh instanciamicrok8s.sh 
