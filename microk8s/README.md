@@ -21,11 +21,18 @@ microk8s.kubectl expose deployment bar-app --type=LoadBalancer --port=8080
 
 microk8s.kubectl apply -f ingress.yml
 ```
+## Probando el app whoami
+```
+microk8s.kubectl -f whoami/.
+
+```
 ## Curl EndPoint
 ```
 curl -kL https://127.0.0.1/bar
 curl -kL https://127.0.0.1/foo
+curl -kL https://127.0.0.1/whoami
 
 curl -kL https://{miippublica}/bar
 curl -kL https://{miippublica}/foo
+curl -kL https://{miippublica}/whoami
 ```
