@@ -9,7 +9,14 @@ Parameters:
     Description: "A prefix for the resource names."
     Type: String
     Default: MiPrimerLabCFN
-
+  TagVersion:
+    Description: "Version tag snapd"
+    Type: String
+    Default: "v0.1.0"
+  RpmVersion:
+    Description: "Version rpm snapd"
+    Type: String
+    Default: "2.36.3-0"
 Resources:
   Instancia01:
     Type: 'AWS::EC2::Instance'
@@ -18,6 +25,7 @@ Resources:
       InstanceType: t2.medium
       InstanceInitiatedShutdownBehavior: terminate
       KeyName: !Ref LlaveEc2
+      Monitoring: true
       #SubnetId: subnet-095799538e3a5008f #subnet por defecto
       SecurityGroupIds:
         - !Ref SecurityGroup01
@@ -26,14 +34,34 @@ Resources:
           Value: !Sub "CDA - ${EnvironmentName}"
       UserData:
         Fn::Base64: !Sub | 
-            #!/bin/bash
+            #!/bin/bash -xe
             yum update -y
-            sudo yum install git -y
+            yum install git -y
             amazon-linux-extras install docker -y
             service docker start
             usermod -a -G docker ec2-user
             curl -L "https://github.com/docker/compose/releases/download/1.28.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             chmod +x /usr/local/bin/docker-compose
+            wget "https://github.com/albuild/snap/releases/download/v0.1.0/snap-confine-2.36.3-0.amzn2.x86_64.rpm" -P /root/Downloads
+            wget "https://github.com/albuild/snap/releases/download/v0.1.0/snapd-2.36.3-0.amzn2.x86_64.rpm" -P /root/Downloads
+            yum -y install "/root/Downloads/snap-confine-2.36.3-0.amzn2.x86_64.rpm" "/root/Downloads/snapd-2.36.3-0.amzn2.x86_64.rpm"
+            systemctl enable --now snapd.socket
+            systemctl enable --now /usr/lib/systemd/system/snapd.socket
+            service snapd.socket start
+            systemctl start snapd.seeded.service
+            /usr/bin/snap install microk8s --classic
+            usermod -a -G microk8s ec2-user
+            #habilitamos el idioma del phyton
+            export LC_ALL=en_US.utf-8
+            export LANG=en_US.utf-8
+            #instalamos microk8s
+            /var/lib/snapd/snap/bin/microk8s status --wait-ready
+            /var/lib/snapd/snap/bin/microk8s enable dns registry ingress
+            echo 'alias kubectl=microk8s.kubectl' >>~/.bashrc
+            echo 'alias k=microk8s.kubectl' >>~/.bashrc
+            alias kubectl=microk8s.kubectl
+            alias k=microk8s.kubectl
+            exec bash
     DependsOn:
       #- ElasticIP01
       - SecurityGroup01

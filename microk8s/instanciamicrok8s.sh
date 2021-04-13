@@ -1,0 +1,2 @@
+#!/bin/bash
+aws cloudformation deploy --region us-east-1 --stack-name instanciamicrok8s  --parameter-overrides EnvironmentName="MiAmbiente" LlaveEc2="KeyEc2CloudFormationVirginia" --template-file ./instanciamicrok8s.yml
