@@ -56,11 +56,13 @@ Resources:
             export LANG=en_US.utf-8
             #instalamos microk8s
             /var/lib/snapd/snap/bin/microk8s status --wait-ready
-            /var/lib/snapd/snap/bin/microk8s enable dns registry ingress
+            /var/lib/snapd/snap/bin/microk8s enable dns registry ingress helm3
             echo 'alias kubectl=microk8s.kubectl' >>~/.bashrc
             echo 'alias k=microk8s.kubectl' >>~/.bashrc
             alias kubectl=microk8s.kubectl
             alias k=microk8s.kubectl
+            echo 'alias helm=microk8s.helm3' >>~/.bashrc
+            alias helm=microk8s.helm3
             exec bash
     DependsOn:
       #- ElasticIP01
