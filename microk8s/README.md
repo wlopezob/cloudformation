@@ -8,7 +8,7 @@ microk8s registry -> https://microk8s.io/docs/registry-built-in
 microk8s Ingress -> https://microk8s.io/docs/addon-ingress
 microk8s metalb -> https://microk8s.io/docs/addon-metallb (opcional)
 ```
-## Pasos para ejecutar el ingress
+## Pasos para ejecutar ingress
 ```
 docker build . -t my-microk8s-app
 docker tag my-microk8s-app localhost:32000/my-microk8s-app
