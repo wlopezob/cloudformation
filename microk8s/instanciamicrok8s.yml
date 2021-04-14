@@ -37,6 +37,7 @@ Resources:
             #!/bin/bash -xe
             yum update -y
             yum install git -y
+            yum install tree -y
             amazon-linux-extras install docker -y
             service docker start
             usermod -a -G docker ec2-user
