@@ -28,11 +28,11 @@ microk8s.kubectl apply -f whoami/.
 ```
 ## Curl EndPoint
 ```
-curl -kL https://127.0.0.1/bar
-curl -kL https://127.0.0.1/foo
-curl -kL https://127.0.0.1/whoami
+curl -kL http://127.0.0.1/bar
+curl -kL http://127.0.0.1/foo
+curl -kL http://127.0.0.1/whoami
 
-curl -kL https://{miippublica}/bar
-curl -kL https://{miippublica}/foo
-curl -kL https://{miippublica}/whoami
+curl -kL http://{miippublica}/bar
+curl -kL http://{miippublica}/foo
+curl -kL http://{miippublica}/whoami
 ```
