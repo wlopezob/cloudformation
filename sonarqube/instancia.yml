@@ -38,9 +38,8 @@ Resources:
             sysctl -w fs.file-max=65536
             ulimit -n 65536
             ulimit -u 4096
-            
-            #git clone https://github.com/wlopezob/cloudformation.git
-            #docker-compose -f cloudformation/odoo/docker-compose.yml up -d
+            git clone https://github.com/wlopezob/cloudformation.git
+            docker-compose -f cloudformation/sonarqube/docker-compose-postgres-example.yml up -d
     DependsOn:
       #- ElasticIP01
       - SecurityGroup01
