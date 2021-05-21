@@ -39,7 +39,7 @@ Resources:
             ulimit -n 65536
             ulimit -u 4096
             git clone https://github.com/wlopezob/cloudformation.git
-            docker-compose -f cloudformation/sonarqube/docker-compose-postgres-example.yml up -d
+            docker-compose -f cloudformation/sonarqube/docker-compose-postgres-example.yml  up -d
     DependsOn:
       #- ElasticIP01
       - SecurityGroup01
