@@ -28,8 +28,16 @@ Resources:
         Fn::Base64: !Sub | 
             #!/bin/bash
             yum update -y
-            sudo yum install git -y
+            yum install git -y
             amazon-linux-extras install docker -y
+            ##instalando php y composer
+            amazon-linux-extras enable php7.2
+            yum clean metadata
+            yum install php php-{pear,cgi,common,curl,mbstring,gd,mysqlnd,gettext,bcmath,json,xml,fpm,intl,zip,imap} -y
+            curl -sS https://getcomposer.org/installer | php
+            sudo mv composer.phar /usr/local/bin/composer
+            ln -s /usr/local/bin/composer /usr/bin/composer
+            ##instalando docker
             service docker start
             usermod -a -G docker ec2-user
             curl -L "https://github.com/docker/compose/releases/download/1.28.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -67,6 +75,10 @@ Resources:
         - IpProtocol: tcp
           FromPort: 9000
           ToPort: 9000
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
           CidrIp: 0.0.0.0/0
 
 Mappings:

@@ -1,0 +1,2 @@
+#levantar un servidor web con php
+php -S 0.0.0.0:8000 
